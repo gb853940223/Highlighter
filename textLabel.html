@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文本标注</title>
+  <style>
+    /* .text-selected {}
+
+    .text-selected .remove {
+      font-style: normal;
+      font-size: 12px;
+      cursor: pointer;
+    } */
+  </style>
+</head>
+
+<body>
+  <div id="colors">
+    <span class="color" onclick="colorSwitch('#f00')" data-color="#f00">红色</span>
+    <span class="color" onclick="colorSwitch('#FFFF00')" data-color="#FFFF00">黄色</span>
+    <span class="color" onclick="colorSwitch('#8A2BE2')" data-color="#8A2BE2">蓝色</span>
+  </div>
+  <div id="text"></div>
+  <button id="btn">保存</button>
+
+  <script>
+    // window.onload = function () {
+
+
+
+
+
+
+    var store = [
+      {
+        "startMeta":
+        {
+          // "parentTagName": "P",
+          "textOffset": 10
+        },
+        "endMeta": {
+          // "parentTagName": "P",
+          "textOffset": 15
+        },
+        "text": "你的心胸要",
+        "id": "111",
+        "color": "#f00"
+      },
+      {
+        "startMeta":
+        {
+          // "parentTagName": "P",
+          "textOffset": 20
+        },
+        "endMeta": {
+          // "parentTagName": "P",
+          "textOffset": 25
+        },
+        "text": "。天天算计",
+        "id": "222",
+        "color": "#FFFF00"
+      }
+    ];
+    store = window.localStorage.getItem('highlight');
+    store = JSON.parse(store);
+    // store = [];
+
+    var str = '你的眼光要比别人远，你的心胸要比他人宽广。天天算计的人生，未来迟早也会被人生算计。除此以外，还活在各种小心眼和小格局之中。人生如同开车一样，当你比别人快30码，你体会到的感受别人无法感知。人生又如同开飞机，当你比别人高30000英尺，你看到的视野自然不同于他人。意思就是，当你在更高更远的美景时，也就不必在意他人短视的眼目。一切自然云淡风轻，不再受影响。强大的人不是征服什么，而是能承受什么。一些事情，只有经历过了，才能明白其中的道理，和懂得人生的真谛。绝望并不可怕，可怕的是失去和激情。经历绝望，但不要被绝望吞噬。相反你要胜过它，如同战胜黑暗，迎接光明一样。';
+    for (let i = 0; i < 10; i ++){
+      str += str;
+    }
+
+    class Style {
+      static createStyle() {
+        const css = `
+        .text-selected .remove {
+          font-style: normal;
+          font-size: 12px;
+          cursor: pointer;
+        }
+      `;
+        const head = document.head || document.getElementsByTagName('head')[0];
+        const style = document.createElement('style');
+        style.type = 'text/css';
+        style.innerHTML = css;
+        head.appendChild(style);
+      }
+
+    }
+
+    class Local {
+      constructor() {
+        this.stores = [];
+      }
+
+      add(store) {
+        this.stores.push(store);
+        console.log(this.stores);
+      }
+
+      remove(id) {
+        let removeIndex = this.stores.findIndex((store) => store.id == id);
+        this.stores.splice(removeIndex, 1);
+        console.log(this.stores);
+      }
+    }
+
+    class Highlighter {
+
+      constructor(obj) {
+        Style.createStyle();
+        this.local = new Local();
+
+        this.textStack = [];
+        // this.letters = []; // 存放被选中的文字内容
+        // this.color = '#f23';
+
+        this.options = this.varMerge(obj);
+        this.textInsert(this.options.text, this.options.el);
+        this.textRender(this.options.store);
+        this.textStackPush(this.options.text);
+        this.selectText();
+
+      }
+
+      varMerge(options) {
+        var _options = {
+          text: '',
+          el: '',
+          color: '#f00',
+          // highClassName: 'text-selected'
+        };
+        return Object.assign({}, _options, options);
+      }
+
+
+      textInsert(text, el) {
+        var dom = this.textTemplate(text);
+        var wrap = document.querySelector(el);
+        this.clean(wrap);
+        wrap.appendChild(dom);
+      }
+
+      selectText() {
+        var wrap = document.querySelector(this.options.el);
+        var selection = window.getSelection();
+        var range = document.createRange();
+        var highlighter = wrap.querySelector('.high-lighter');
+        highlighter.addEventListener('mouseup', (event) => {
+          if (event.target.classList.contains('text-selected') || event.target.classList.contains('remove')) {
+            return;
+          }
+          if (selection.anchorNode === selection.focusNode && selection.anchorOffset < selection.focusOffset) {
+            var randomId = new Date().getTime();
+            var span = this.createHighLightSpan({
+              id: randomId,
+              color: this.options.color,
+            });
+
+            this.getSerialize(selection, randomId);
+
+            range.setStart(selection.anchorNode, selection.anchorOffset);
+            range.setEnd(selection.anchorNode, selection.focusOffset);
+            // this.letters.push(selection.toString());
+            range.surroundContents(span);
+            span.append(this.createI(randomId));
+            this.textStackPush(highlighter.innerHTML);
+
+          }
+        })
+      }
+
+      textRender(store) {
+        // console.log(store);
+        // if (store == null || store.length === 0) {
+        //   return;
+        // }
+        var range = this.getDeSerialize(store);
+      }
+
+      textSave() {
+        // return this.getSerialize();
+        return this.local.stores;
+      }
+
+      removeText(event, randomId) {
+        event.stopPropagation();
+        event.preventDefault();
+        var $cur = event.target.parentNode;
+        var curId = $cur.id;
+        this.removeIDom($cur);
+        this.local.remove(curId);
+        var $parent = $cur.parentNode;
+        var $fr = document.createDocumentFragment();
+        this.forEach($cur.childNodes, $c => $fr.appendChild($c.cloneNode(false)));
+
+        var $prev = $cur.previousSibling;
+        var $next = $cur.nextSibling;
+
+        $parent.replaceChild($fr, $cur);
+
+        this.normalizeSiblingText($prev, true);
+        this.normalizeSiblingText($next, false);
+
+      }
+
+      removeIDom($node) {
+        var $node = event.target.parentNode;
+        var $removeI = $node.querySelector('i');
+        $node.removeChild($removeI);
+      }
+
+      normalizeSiblingText($s, isNext) {
+        isNext = isNext == null ? true : isNext;
+        if (!$s || $s.nodeType !== 3) {
+          return;
+        }
+        var $sibling = isNext ? $s.nextSibling : $s.previousSibling;
+        if ($sibling.nodeType !== 3) {
+          return;
+        }
+        var text = $sibling.nodeValue;
+        $s.nodeValue = isNext ? ($s.nodeValue + text) : (text + $s.nodeValue);
+        $sibling.parentNode.removeChild($sibling);
+
+      }
+
+      textTemplate(str) {
+        var dom = document.createElement('p');
+        dom.className = 'high-lighter';
+        dom.innerHTML = str;
+        return dom;
+      }
+
+      createHighLightSpan(params) {
+        var { id, color, startOffset, endOffset } = params;
+        var span = document.createElement('span');
+        span.className = 'text-selected';
+        span.id = id;
+        span.style.backgroundColor = color;
+        return span;
+      }
+
+      createI(id) {
+        var i = document.createElement('i');
+        i.className = 'remove';
+        i.innerHTML = '删除';
+        i.onclick = () => {
+          this.removeText(event, id);
+        };
+        i.setAttribute('data-id', id)
+        return i;
+      }
+
+      textStackPush(innerHTML) {
+        this.textStack.push(innerHTML);
+      }
+
+      textStackPop() {
+        return this.textStack.pop();
+      }
+
+      clean($wrap) {
+        $wrap.innerHTML = null;
+      }
+
+      // repeal() {
+      //   if (this.textStack.length <= 1) return;
+      //   this.textStackPop();
+      //   var $cur = document.querySelector(this.options.el).querySelector('.high-lighter');
+      //   $cur.innerHTML = this.textStack[this.textStack.length - 1];
+      // }
+
+
+      forEach($nodes, cb) {
+        for (var i = 0; i < $nodes.length; i++) {
+          cb($nodes[i], i, $nodes);
+        }
+      };
+
+      _handleSelection(params) {
+        var { selection, id } = params;
+        var start = {
+          $node: selection.anchorNode,
+          offset: selection.anchorOffset,
+        };
+        var end = {
+          $node: selection.focusNode,
+          offset: selection.focusOffset,
+        }
+
+        var text = selection.toString();
+
+        return {
+          start,
+          end,
+          text,
+          id,
+          color: this.options.color
+        }
+
+      }
+
+      fromSelection() {
+        var range = this.getDomRange();
+        console.log(range);
+      }
+
+      // removeDomRange() {
+      //   window.getSelection().removeAllRanges();
+      // }
+
+      _highlightFromHRange(range) {
+        var source = this.serialize(range);
+        this.local.add(source);
+      }
+
+      getSerialize(selection, randomId) {
+        var serializeData = this._handleSelection({
+          selection: selection,
+          id: randomId,
+        });
+        if (serializeData) {
+          this._highlightFromHRange(serializeData);
+        }
+      }
+
+      serialize(metaData) {
+        var startMeta = this.getDomMeta(metaData.start.$node, metaData.start.offset);
+        var endMeta = this.getDomMeta(metaData.end.$node, metaData.end.offset);
+        return {
+          startMeta: {
+            textOffset: startMeta.textOffset
+          },
+          endMeta: {
+            textOffset: endMeta.textOffset
+          },
+          text: metaData.text,
+          id: metaData.id,
+          color: metaData.color
+        }
+      }
+
+      getDomMeta($node, offset) {
+        var $originParent = this.getOriginParent($node);
+        var preNodeOffset = this.getTextPreOffset($originParent, $node);
+        return {
+          textOffset: preNodeOffset + offset
+        }
+      }
+
+      getOriginParent($node) {
+        return $node.parentNode;
+      }
+
+      getTextPreOffset($root, $text) {
+        var nodeStack = [$root];
+
+        var $curNode = null;
+        var offset = 0;
+        while ($curNode = nodeStack.pop()) {
+          var children = $curNode.childNodes;
+          for (var i = children.length - 1; i >= 0; i--) {
+            nodeStack.push(children[i]);
+          }
+
+          if ($curNode.nodeType === 3 && $curNode !== $text) {
+            offset += $curNode.textContent.length;
+          }
+          else if ($curNode.nodeType === 3) {
+            break;
+          }
+        }
+        return offset;
+      }
+
+      getDeSerialize(stores) {
+        var res = [];
+        stores = stores || [];
+        stores.forEach((store) => {
+          var _store = {
+            ...this.deSerialize(store),
+            id: store.id,
+            text: store.text,
+            color: store.color
+          }
+          res.push(_store);
+          var $nodes = this.highlightRange(_store);
+        });
+        return res;
+      }
+
+      deSerialize(metaData) {
+        var wrap = document.querySelector(this.options.el);
+        const { start, end } = this.queryElementNode(wrap);
+        var startInfo = this.getTextChildByOffset(start, metaData.startMeta.textOffset);
+        var endInfo = this.getTextChildByOffset(end, metaData.endMeta.textOffset);
+        const range = {
+          startInfo,
+          endInfo,
+        }
+        return range;
+      }
+
+      queryElementNode($node) {
+        var start = $node.querySelector('.high-lighter');
+        var end = $node.querySelector('.high-lighter');
+        return { start, end };
+      }
+
+      getTextChildByOffset($parent, offset) {
+        var nodeStack = [$parent];
+
+        var $curNode = null;
+        var curOffset = 0;
+        var startOffset = 0;
+        while ($curNode = nodeStack.pop()) {
+          var children = $curNode.childNodes;
+          for (var i = children.length - 1; i >= 0; i--) {
+            nodeStack.push(children[i]);
+          }
+
+          if ($curNode.nodeType === 3) {
+            startOffset = offset - curOffset;
+            curOffset += $curNode.textContent.length;
+            if (curOffset >= offset) {
+              break;
+            }
+          }
+        }
+
+        if (!$curNode) {
+          $curNode = $parent;
+        }
+        return {
+          $node: $curNode,
+          offset: startOffset
+        };
+      }
+
+      highlightRange(range) {
+        var wrap = document.querySelector(this.options.el);
+        var text = wrap.querySelector('.high-lighter');
+        var $selectedNodes = this.getSelectedNodes(wrap, range.startInfo, range.endInfo);
+
+        return $selectedNodes.map(n => {
+
+          var $node = this.wrapHighlight(n, range);
+          return $node;
+        });
+      }
+
+      getSelectedNodes($root, start, end) {
+        var $startNode = start.$node;
+        var $endNode = end.$node;
+        var startOffset = start.offset;
+        var endOffset = end.offset;
+        return this.getNodesIfSameStartEnd($startNode, startOffset, endOffset);
+      }
+
+      getNodesIfSameStartEnd($startNode, startOffset, endOffset,) {
+
+        $startNode.splitText(startOffset);
+        var passedNode = $startNode.nextSibling;
+        passedNode.splitText(endOffset - startOffset);
+        return [{
+          $node: passedNode,
+        }];
+      }
+
+      wrapHighlight(selected, range) {
+        return this.wrapNewNode(selected, range);
+      }
+
+      wrapNewNode(selected, range) {
+        var $span = this.createHighLightSpan({
+          id: range.id,
+          color: range.color,
+          startOffset: range.startInfo.offset,
+          endOffset: range.endInfo.offset
+        });
+        $span.appendChild(selected.$node.cloneNode(false));
+        $span.append(this.createI(range.id));
+        selected.$node.parentNode.replaceChild($span, selected.$node);
+      }
+    }
+
+    /*****使用***/
+    var highlighter = new Highlighter({
+      el: '#text',
+      text: str,
+      store: store
+    });
+
+    var btn = document.getElementById('btn');
+    btn.addEventListener('click', function () {
+      var saveData = highlighter.textSave();
+      // console.log(saveData);
+      window.localStorage.setItem('highlight', JSON.stringify(saveData))
+    })
+
+    function colorSwitch(color) {
+      // console.log(color);
+      highlighter.options.color = color;
+    }
+
+    // }
+
+
+  </script>
+
+</body>
+
+</html>
